@@ -1,0 +1,12 @@
+{
+  "name": "Statehandler",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Statehandler": {
+        "$path": "src/Statehandler"
+      }
+    }
+  }
+}
