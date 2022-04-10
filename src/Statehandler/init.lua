@@ -158,7 +158,7 @@ end
 
 function server.AddState(Ins:Instance | {Instance}, State:string, value:number)
 	assert(typeof(Ins) == "Instance" or typeof(Ins) == "table", "Instance or array expected")
-	assert(((typeof(Ins) == "table" and Ins == module) or typeof(Ins) == 'table'), "Cannot pass self as argument")
+	assert(((typeof(Ins) == "table" and Ins ~= module) or typeof(Ins) == 'Instance'), "Cannot pass self as argument")
 
 	assert(typeof(State) == "string", "string expected")
 	assert(typeof(value) == "number", "number expected")
@@ -200,7 +200,7 @@ end
 function server.RemoveState(Ins:Instance, State:string)
 	assert(typeof(Ins) == "Instance", "Instance expected")
 	assert(typeof(State) == "string", "string expected")
-	
+
 
 	if module._States[Ins] == nil then
 		return
