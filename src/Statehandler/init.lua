@@ -41,7 +41,10 @@ local client = {
 -- SHARED
 module._States = {} :: {
 	[Instance]: {
-		[string]: number
+		[string]: {
+			start: number,
+			duration: number
+		}
 	}
 }
 module._objDestroying = {} :: {
@@ -80,16 +83,21 @@ local function MainHeartbeat(d)
 
 	for instance, tbl in pairs(module._States) do
 		for state, value in pairs(tbl) do
-			if value < nowTime then
+			if value.start + value.duration < nowTime then
+				
+				if module._listeners[state] ~= nil then
+					for _, listener in pairs(module._listeners[state]) do
+						task.defer(listener, instance)
+					end
+				end
+
 				tbl[state] = nil
 			else
 				-- fire stepped functions
-				if module._steplisteners[state] == nil then
-					continue
-				end
-
-				for _, listener in pairs(module._steplisteners[state]) do
-					listener(d, instance, value)
+				if module._steplisteners[state] ~= nil then
+					for _, listener in pairs(module._steplisteners[state]) do
+						task.defer(listener, d, instance, value.duration)
+					end
 				end
 			end
 		end
@@ -109,9 +117,9 @@ function module.HasState(Obj:Instance, State:string)
 		return false
 	end
 
-	local CurrentState: number = module._States[Obj][State]
+	local CurrentState = module._States[Obj][State]
 
-	return ServerTimeNow < CurrentState
+	return ServerTimeNow <  CurrentState.start + CurrentState.duration 
 end
 
 function module.AddListener(State:string, Callback:(Instance, number) -> nil)
@@ -170,7 +178,10 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value:number)
 			module._States[obj] = {}
 		end
 	
-		module._States[obj][State] = workspace:GetServerTimeNow() + value
+		module._States[obj][State] =  {
+			start = workspace:GetServerTimeNow(),
+			duration = value
+		}
 		
 		if obj:IsA("Player") then
 			StatesRemote:FireClient(obj, obj, State, module._States[obj][State])
@@ -188,6 +199,7 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value:number)
 	else
 		apply(Ins)
 	end
+	
 
 	-- fire listeners
 	if module._listeners[State] then
@@ -207,7 +219,7 @@ function server.RemoveState(Ins:Instance, State:string)
 	end
 	module._States[Ins][State] = nil
 	if Ins:IsA("Player") then
-		StatesRemote:FireClient(Ins, Ins, State, 'nil') 
+		StatesRemote:FireClient(Ins :: Player, Ins, State, 'nil') 
 	else
 		StatesRemote:FireAllClients(Ins, State, 'nil')
 	end
@@ -228,7 +240,7 @@ end
 if RunService:IsServer() then
 	module = setmetatable(module, {__index = server})
 
-	local hasRequested:{[Player]: boolean} = {}
+	local hasRequested:{[Player]: boolean?} = {}
 
 	StatesRemote.OnServerEvent:Connect(function(player)
 		-- request states
@@ -251,15 +263,15 @@ if RunService:IsServer() then
 else
 	module = setmetatable(module, {__index = client})
 
-	StatesRemote.OnClientEvent:Connect(function(Inst:Instance?, State:string, value:number?)
+	StatesRemote.OnClientEvent:Connect(function(Inst:Instance, State:string, value: {start: number, duration: number}? )
 		if Inst ~= nil then
 			if module._States[Inst] == nil then
 				module._States[Inst] = {}
 			end
 
-			if value == 'nil' then
+			if value == nil then
 				module._States[Inst][State] = nil
-			elseif typeof(value) == 'number' then
+			elseif typeof(value) == "table" then
 				module._States[Inst][State] = value
 			end
 			
@@ -267,7 +279,7 @@ else
 		
 			if module._listeners[State] then
 				for _, Callback in pairs(module._listeners[State]) do
-					task.defer(Callback, Inst, value)
+					task.defer(Callback, Inst, if value ~= nil then value.duration else nil )
 				end
 			end
 
@@ -281,13 +293,13 @@ export type ServerStateHandler = {
 	AddState:(Instance, string, number) -> nil,
 	RemoveState:(Instance, string) -> nil,
 	HasState:(Instance, string) -> boolean,
-	AddListener:(string, (Instance, number) -> nil) -> nil,
+	AddListener:(string, (Instance, number?) -> nil) -> nil,
 	AddListenerStepped:(string, (number, Instance, number) -> nil) -> nil,
 }
 
 export type ClientStateHandler = {
 	HasState: (Instance, string) -> boolean,
-	AddListener: (string, (Instance, number) -> nil) -> nil,
+	AddListener: (string, (Instance, number?) -> nil) -> nil,
 	AddListenerStepped:(string, (number, Instance, number) -> nil) -> nil,
 
 	RequestData: () -> nil,
