@@ -335,7 +335,7 @@ else
 end
 
 export type ServerStateHandler = {
-	AddState:(Instance, string, number) -> nil,
+	AddState:(Instance, string, number | string | boolean) -> nil,
 	RemoveState:(Instance, string) -> nil,
 	HasState:(Instance, string) -> boolean,
 	AddListener:(string, (Instance, number?) -> nil) -> nil,
