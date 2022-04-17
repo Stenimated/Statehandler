@@ -2,7 +2,6 @@
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --
