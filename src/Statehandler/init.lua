@@ -205,8 +205,6 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value: Accepta
 			value = if typeof(value) == 'number' then {start = workspace:GetServerTimeNow(), duration =  value} else value,
 			extraArguments = args,
 		}
-
-		print(StateProps)
 	
 		module._States[obj][State] =  StateProps
 		
