@@ -1,6 +1,7 @@
 # Statehandler
 
 ## Documentation
+bit outdated, new api.
 
 ```lua
 Fetching module

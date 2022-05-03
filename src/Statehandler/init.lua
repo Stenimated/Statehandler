@@ -3,7 +3,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 --
 export type AcceptableState = number | string | boolean 
 
@@ -19,7 +18,7 @@ local HasRequestedInitData = false
 local Util = {} do
 	function Util.GetRemoteEvent(Name:string):RemoteEvent
 	   if RunService:IsClient() then
-			return Settings.RemoteEventsContainer:WaitForChild(Name)
+			return Settings.RemoteEventsContainer:WaitForChild(Name) :: RemoteEvent
 		end 
 		local Remote = Instance.new("RemoteEvent")
 		Remote.Name = Name
@@ -30,7 +29,6 @@ end
 
 --
 local StatesRemote = Util.GetRemoteEvent("States")
-
 --
 
 local module = {
@@ -44,9 +42,9 @@ local client = {
 module._States = {} :: {
 	[Instance]: {
 		[string]: {
-			start: number,
-			duration: number
-		} | string | boolean
+			value: AcceptableState | {start:number, duration:number},
+			extraArguments: {[any]: any}
+		}
 	}
 }
 module._objDestroying = {} :: {
@@ -67,9 +65,10 @@ module._steplisteners = {} :: {
 
 local function DestroyingListener(Instance)
 	-- add destroy listener
-	if module._objDestroying[Instance] == nil then
-		module._objDestroying[Instance] = Instance.AncestryChanged:Connect(function(_Obj, Parent)
-			if Parent == nil then
+	if not module._objDestroying[Instance] then
+
+		module._objDestroying[Instance] = Instance.AncestryChanged:Connect(function()
+			if not Instance.Parent then
 				module._States[Instance] = nil
 				module._objDestroying[Instance]:Disconnect()
 				module._objDestroying[Instance] = nil
@@ -86,8 +85,10 @@ local function MainHeartbeat(d)
 	for instance, tbl in pairs(module._States) do
 		for state, value in pairs(tbl) do
 
-			if typeof(value) == 'table'  then
-				if value.start + value.duration < nowTime then
+			local val = value.value
+
+			if typeof(val) == 'table'  then
+				if val.duration + val.start  < nowTime then
 					if module._listeners[state] ~= nil then
 						for _, listener in pairs(module._listeners[state]) do
 							task.defer(listener, instance)
@@ -99,14 +100,14 @@ local function MainHeartbeat(d)
 					-- fire stepped functions
 					if module._steplisteners[state] ~= nil then
 						for _, listener in pairs(module._steplisteners[state]) do
-							task.defer(listener, d, instance, value.duration)
+							task.defer(listener, d, instance, val.duration)
 						end
 					end
 				end
-			elseif typeof(value) == 'boolean' or typeof(value) == 'string'  then
+			elseif typeof(val) == 'boolean' or typeof(val) == 'string'  then
 				if module._steplisteners[state] ~= nil then
 					for _, listener in pairs(module._steplisteners[state]) do
-						task.defer(listener, d, instance, value)
+						task.defer(listener, d, instance, val)
 					end
 				end
 			end
@@ -117,7 +118,6 @@ end
 -- SHARED FUNCTIONS
 
 function module.HasState(Obj:Instance, State:string)
-	assert(Obj ~= module, "Cannot check state on self")
 	assert(typeof(Obj) == "Instance", "Object must be an Instance")
 	assert(typeof(State) == "string", "State must be a stringf")
 	
@@ -129,15 +129,15 @@ function module.HasState(Obj:Instance, State:string)
 
 	local CurrentState = module._States[Obj][State]
 
+	local value = CurrentState.value
 
-	if typeof(CurrentState) == 'table' then
-		return ServerTimeNow <  CurrentState.start + CurrentState.duration 
-	elseif typeof(CurrentState) == 'boolean' then
-		return CurrentState
-	elseif typeof(CurrentState) == 'string' then
+	if typeof(value) == 'table' then
+		return ServerTimeNow <  value.start + value.duration 
+	elseif typeof(value) == 'boolean' then
+		return value
+	elseif typeof(value) == 'string' then
 		return true		
 	end
-	print('BRUUUUUUUUUUUUH IGNOREEEEEEEED')
 	return false
 end
 
@@ -183,7 +183,7 @@ end
 
 -- SERVER FUNCTIONS
 
-function server.AddState(Ins:Instance | {Instance}, State:string, value: AcceptableState)
+function server.AddState(Ins:Instance | {Instance}, State:string, value: AcceptableState, ...)
 	assert(typeof(Ins) == "Instance" or typeof(Ins) == "table", "Instance or array expected")
 	assert(((typeof(Ins) == "table" and Ins ~= module) or typeof(Ins) == 'Instance'), "Cannot pass self as argument")
 
@@ -194,26 +194,32 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value: Accepta
 	elseif not typeof(value) == 'string' then
 		return error("value must be a number or string")
 	end
+	local args = {...}
 	
 	local function apply(obj:Instance)
 		if module._States[obj] == nil then
 			module._States[obj] = {}
 		end
 	
-		local appliedState = if typeof(value) == 'number' then
-			{
-				start = workspace:GetServerTimeNow(),
-				duration = value
-			}
-		else
-			value
-
-		module._States[obj][State] =  appliedState
+		local StateProps = {
+			value = if typeof(value) == 'number' then {start = workspace:GetServerTimeNow(), duration =  value} else value,
+			extraArguments = args,
+		}
+	
+		module._States[obj][State] =  StateProps
 		
 		if obj:IsA("Player") then
-			StatesRemote:FireClient(obj, obj, State, appliedState)
+			StatesRemote:FireClient(obj, {
+				obj = obj,
+				state = State,
+				props = StateProps
+			})
 		else
-			StatesRemote:FireAllClients(obj, State, appliedState)
+			StatesRemote:FireAllClients({
+				obj = obj,
+				state = State,
+				props = StateProps
+			})
 		end
 
 		DestroyingListener(obj)
@@ -231,7 +237,7 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value: Accepta
 	-- fire listeners
 	if module._listeners[State] then
 		for _, listener in pairs(module._listeners[State]) do
-			task.defer(listener, Ins, value)
+			task.defer(listener, Ins, value, ...)
 		end
 	end
 end
@@ -247,9 +253,16 @@ function server.RemoveState(Ins:Instance, State:string)
 	module._States[Ins][State] = nil
 
 	if Ins:IsA("Player") then
-		StatesRemote:FireClient(Ins :: Player, Ins, State) 
+		StatesRemote:FireClient(Ins :: Player, {
+			remove = true,
+			state = State
+		}) 
 	else
-		StatesRemote:FireAllClients(Ins, State)
+		StatesRemote:FireAllClients({
+			obj = Ins,
+			remove = true,
+			state = State
+		})
 	end
 
 	-- fire srversided listeners
@@ -285,7 +298,12 @@ if RunService:IsServer() then
 
 				if (ins:IsA("Player") and ins == player) or not ins:IsA("Player") then
 					for state, value in pairs(states) do
-						StatesRemote:FireClient(player, ins, state, value)
+						
+						StatesRemote:FireAllClients({
+							obj = ins,
+							state = state,
+							props = value
+						})
 					end
 				end
 			end
@@ -298,37 +316,59 @@ if RunService:IsServer() then
 else
 	module = setmetatable(module, {__index = client})
 
-	StatesRemote.OnClientEvent:Connect(function(Inst:Instance, State:string, value: {start: number, duration: number} | string | nil )
-		if Inst ~= nil then
-			if module._States[Inst] == nil then
-				module._States[Inst] = {}
+	type StateInfo = {
+		remove: boolean?,
+		obj: Instance,
+		state: string,
+		props: {
+			value: AcceptableState | {start:number, duration:number},
+			extraArguments: {[any]: any}
+		}
+	}
+
+	StatesRemote.OnClientEvent:Connect(function(stateInfo:StateInfo)
+		local obj = stateInfo.obj
+		local state = stateInfo.state
+		local props = stateInfo.props
+		local remove = stateInfo.remove	
+
+		if obj then
+			if module._States[obj] == nil then
+				module._States[obj] = {}
 			end
 
-			if value == nil  then
-				module._States[Inst][State] = nil
+			if remove then
+				module._States[obj][state] = nil
 			else
-				module._States[Inst][State] = value
+				module._States[obj][state] = props :: {
+					value: AcceptableState | {start:number, duration:number},
+					extraArguments: {[any]: any}
+				}
 			end
 			
 			-- fire client sided listeners
 		
-			if module._listeners[State] then
-				for _, Callback in pairs(module._listeners[State]) do
+			if module._listeners[state] then
+				for _, Callback in pairs(module._listeners[state]) do
 					local val = 
-						if value ~= nil then 
-							if typeof(value) == "table" then 
-									value.duration 
+						if state ~= nil then 
+							if typeof(props.value) == "table" then 
+									props.value.duration
 								else 
-									value 
+									props.value
 							else 
 								nil 
 
-					task.defer(Callback, Inst, val )
+					if props then
+						task.defer(Callback, obj, val, table.unpack(props.extraArguments))
+					else
+						task.defer(Callback, obj, val)
+					end
 				end
 			end
 
 			-- destroy listener
-			DestroyingListener(Inst)
+			DestroyingListener(obj)
 		end
 	end)
 end

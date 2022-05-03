@@ -6,6 +6,24 @@
     "ReplicatedStorage": {
       "Statehandler": {
         "$path": "src/Statehandler"
+      },
+
+      "Test": {
+        "$className": "RemoteEvent"
+      }
+    },
+
+    "ServerScriptService": {
+      "Test-SERVER": {
+        "$path": "test/Server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Test-CLIENT": {
+          "$path": "test/Client"
+        }
       }
     }
   }
