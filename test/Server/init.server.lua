@@ -8,6 +8,14 @@ local TestRemote = ReplicatedStorage.Test
 
 --
 
+StateHandler.AddState(workspace.Baseplate, "Test", "aaaaaaaaaaaaaa")
+task.delay(5, function()
+    
+    StateHandler.RemoveState(workspace.Baseplate, "Test")
+end)
+--[[
+
+
 local function RunTests(player:Player)
     print("[SERVER]: Running tests")
     -- run tests
@@ -137,3 +145,5 @@ TestRemote.OnServerEvent:Connect(function(player, state:string)
         RunTests(player)
     end
 end)
+
+]]

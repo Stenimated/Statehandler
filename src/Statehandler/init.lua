@@ -205,6 +205,8 @@ function server.AddState(Ins:Instance | {Instance}, State:string, value: Accepta
 			value = if typeof(value) == 'number' then {start = workspace:GetServerTimeNow(), duration =  value} else value,
 			extraArguments = args,
 		}
+
+		print(StateProps)
 	
 		module._States[obj][State] =  StateProps
 		
@@ -350,15 +352,17 @@ else
 		
 			if module._listeners[state] then
 				for _, Callback in pairs(module._listeners[state]) do
+
 					local val = 
-						if state ~= nil then 
+						if props ~= nil then 
 							if typeof(props.value) == "table" then 
 									props.value.duration
 								else 
 									props.value
 							else 
 								nil 
-
+				
+					
 					if props then
 						task.defer(Callback, obj, val, table.unpack(props.extraArguments))
 					else

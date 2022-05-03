@@ -35,8 +35,13 @@ end
 
 --
 
+StateHandler.AddListener("Test", function(...)
+    print(...)
+end)
+
 StateHandler.AddListener("Test-Number", function(instance, state)
     PASSED["Test-Number"].event = true
+    print(state)
 end)
 StateHandler.AddListenerStepped("Test-Number", function(instance, state)
     PASSED["Test-Number"].stepped = true
