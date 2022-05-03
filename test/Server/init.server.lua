@@ -138,5 +138,9 @@ TestRemote.OnServerEvent:Connect(function(player, state:string)
 
     if state == "RUN" then
         RunTests(player)
+    elseif state == "A" then
+        StateHandler.AddState(player, "booleanOnPlayer", true, 5)
+        task.wait(1)
+        StateHandler.RemoveState(player, "booleanOnPlayer")
     end
 end)

@@ -254,6 +254,7 @@ function server.RemoveState(Ins:Instance, State:string)
 
 	if Ins:IsA("Player") then
 		StatesRemote:FireClient(Ins :: Player, {
+			obj = Ins,
 			remove = true,
 			state = State
 		}) 
@@ -337,7 +338,7 @@ else
 				module._States[obj] = {}
 			end
 
-			if remove then
+			if remove == true then
 				module._States[obj][state] = nil
 			else
 				module._States[obj][state] = props :: {

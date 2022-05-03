@@ -1,9 +1,16 @@
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 
 local StateHandler = require(ReplicatedStorage.Statehandler).GetClient()
 
 local TestRemote = ReplicatedStorage.Test
+
+
+
+local localPlayer = Players.LocalPlayer
+
+
 
 --
 
@@ -101,3 +108,9 @@ end)
 
 print("[CLIENT]: Running tests")
 TestRemote:FireServer("RUN")
+
+
+StateHandler.AddListener('booleanOnPlayer', function(...)
+    print(...)
+end)
+TestRemote:FireServer("A")
