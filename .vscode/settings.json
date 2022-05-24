@@ -1,0 +1,6 @@
+{
+    "robloxLsp.diagnostics.disable": [
+        1003,
+        "unknown-diag-code"
+    ]
+}
